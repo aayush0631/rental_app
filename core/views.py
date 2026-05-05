@@ -162,3 +162,55 @@ def delete_service(request, service_id):
         return JsonResponse({"message": "Service deleted"})
 
     return JsonResponse({"error": "DELETE required"})
+
+def filter_services(request):
+    query = {}
+
+    # category filter
+    category = request.GET.get("category")
+    if category:
+        query["category"] = category
+
+    # price range filter
+    min_price = request.GET.get("min_price")
+    max_price = request.GET.get("max_price")
+
+    if min_price and max_price:
+        query["price"] = {
+            "$gte": int(min_price),
+            "$lte": int(max_price)
+        }
+
+    # search by title
+    search = request.GET.get("search")
+    if search:
+        query["title"] = {"$regex": search, "$options": "i"}
+
+    services = list(services_collection.find(query))
+
+    for s in services:
+        s["_id"] = str(s["_id"])
+
+    return JsonResponse(services, safe=False)
+
+def nearby_services(request):
+    lat = float(request.GET.get("lat"))
+    lng = float(request.GET.get("lng"))
+    radius = int(request.GET.get("radius", 5000))  # meters
+
+    services = list(services_collection.find({
+        "location": {
+            "$near": {
+                "$geometry": {
+                    "type": "Point",
+                    "coordinates": [lng, lat]
+                },
+                "$maxDistance": radius
+            }
+        }
+    }))
+
+    for s in services:
+        s["_id"] = str(s["_id"])
+
+    return JsonResponse(services, safe=False)   
